@@ -1,0 +1,77 @@
+#equation 1
+see Zhao et al. (2015)
+
+#equation 2
+        ETA_input <- list(list("X1" = X_mat, model = "BRR"))  #additive marker matrix
+
+        fmBRR <- BGLR(y = ph$Yna,
+                      ETA = ETA_input,
+                      nIter = 10000,
+                      burnIn = 1000,
+                      verbose = F,
+                      saveAt = paste0("output/bglr/saveAt_program_runs/",
+                                      cv, 
+                                      "_"))
+
+#equation 3
+        ETA_input <- list(list("X1" = X_mat, model = "BRR"),  #additive marker matrix
+                          list("X2" = U_mat, model = "BRR"))  #dominance marker matrix
+        fmBRR <- BGLR(y = ph$Yna,
+                      ETA = ETA_input,
+                      nIter = 10000,
+                      burnIn = 1000,
+                      verbose = F,
+                      saveAt = paste0("output/bglr/saveAt_program_runs/",
+                                      cv, 
+                                      "_"))
+
+
+
+#equation 4
+res <- asreml(fixed = yield ~ genotype_standard, 
+              random = ~ location + at(location):block,
+              aom = F,
+              na.action = na.method(x = 'omit'),
+              residual = ~ dsum(~id(units) | location),
+              data = rrgs_processed
+)
+
+
+res_dat <- data.frame("index" = seq_along(rrgs_processed$genotype_standard),
+                      "residuals" = res$residuals
+)
+
+pred <- predict(res,
+                classify="genotype_standard",
+                pworkspace = 128e6, sed=TRUE)
+
+
+#equation 5
+fgca_res <- asreml(fixed = yield ~ line_hybrid,
+                   random = ~ location +                     
+                     location:block +                         
+                     line_hybrid:location +
+                     dummy_line:genotype_standard +
+                     dummy_line:genotype_standard:location +  #line x  Environment
+                     dummy_hybrid:parent_line_2 +             #GCA - male
+                     dummy_hybrid:parent_line_2:location +    #GCA - male  x  Environment
+                     dummy_hybrid:parent_line_1 +             #GCA - female
+                     dummy_hybrid:parent_line_1:location +    #GCA - female x  Environment
+                     dummy_hybrid:genotype_standard +         #SCA
+                     dummy_hybrid:genotype_standard:location, #SCA x Environment
+                   aom=FALSE,
+                   na.action = na.method(x = "omit"),#, y = "include"),
+                   residual= ~dsum(~ id(units) | location),
+                   data=phe
+)
+
+varGcaM <- var_all["dummy_hybrid:parent_line_2","component"]
+varGcaF <- var_all["dummy_hybrid:parent_line_1","component"]
+varSca <- var_all["dummy_hybrid:genotype_standard","component"]
+var_hybrid<- varSca+varGcaF +varGcaM
+
+varMenv <- var_all["dummy_hybrid:parent_line_2:location","component"]
+varFenv <- var_all["dummy_hybrid:parent_line_1:location","component"]
+varSenv <- var_all["dummy_hybrid:genotype_standard:location","component"]
+var_hybrid_env<- varFenv+varMenv + varSenv
+
